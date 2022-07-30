@@ -1,6 +1,6 @@
 part of 'image_filter.dart';
 
-/// * [brightness] 0.0 ~ 1.0
+/// * [brightness] -1.0 ~ 1.0
 class BrightnessFilter extends ImageFilter {
   const BrightnessFilter({
     double brightness = 0,

@@ -1,7 +1,6 @@
 package com.lucky1213.flutter_gpu_image
 
 import androidx.annotation.NonNull
-import com.facebook.drawee.backends.pipeline.Fresco
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -23,10 +22,6 @@ class FlutterGpuImagePlugin: FlutterPlugin, MethodCallHandler {
     binding = flutterPluginBinding
     channel = MethodChannel(binding.binaryMessenger, "flutter_gpu_image")
     channel.setMethodCallHandler(this)
-
-    if (!Fresco.hasBeenInitialized()) {
-      Fresco.initialize(binding.applicationContext)
-    }
   }
 
   override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {

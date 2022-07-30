@@ -20,7 +20,7 @@ class FlutterGpuImage extends StatefulWidget {
   const FlutterGpuImage({
     Key? key,
     required this.image,
-    this.filter,
+    this.filter = const [],
     this.controller,
     this.width,
     this.height,
@@ -30,7 +30,7 @@ class FlutterGpuImage extends StatefulWidget {
   }) : super(key: key);
 
   final FlutterGpuImageProvider image;
-  final ImageFilter? filter;
+  final List<ImageFilter> filter;
   final FlutterGpuImageController? controller;
   final double? width;
   final double? height;

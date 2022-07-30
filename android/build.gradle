@@ -51,9 +51,11 @@ android {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation 'com.facebook.fresco:fresco:2.6.0'
-    implementation 'jp.wasabeef.transformers:fresco:1.0.6'
+    implementation 'jp.co.cyberagent.android:gpuimage:2.1.0'
+
+    implementation("io.coil-kt:coil:2.1.0")
+
+    implementation 'jp.wasabeef.transformers:coil:1.0.6'
     // Use the GPU Filters
-    implementation 'jp.wasabeef.transformers:fresco-gpu:1.0.6'
-    implementation(name: 'gpuimage-1.0.0-48', ext: 'aar')
+    implementation 'jp.wasabeef.transformers:coil-gpu:1.0.6'
 }

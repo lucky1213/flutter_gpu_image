@@ -3,45 +3,42 @@ package com.lucky1213.flutter_gpu_image
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
-import android.graphics.SurfaceTexture
-import android.net.Uri
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
-import android.util.Base64
 import android.view.Surface
 import androidx.annotation.NonNull
-import com.facebook.common.executors.CallerThreadExecutor
-import com.facebook.common.references.CloseableReference
-import com.facebook.datasource.DataSource
-import com.facebook.drawee.backends.pipeline.Fresco
-import com.facebook.imagepipeline.core.ImagePipeline
-import com.facebook.imagepipeline.datasource.BaseBitmapDataSubscriber
-import com.facebook.imagepipeline.image.CloseableImage
-import com.facebook.imagepipeline.request.ImageRequest
-import com.facebook.imagepipeline.request.ImageRequestBuilder
+import coil.ImageLoader
+import coil.request.ErrorResult
+import coil.request.ImageRequest
+import coil.target.Target
+import coil.transform.Transformation
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.view.TextureRegistry
-import jp.wasabeef.transformers.fresco.gpu.BrightnessFilterPostprocessor
-import jp.wasabeef.transformers.fresco.gpu.ContrastFilterPostprocessor
+import jp.wasabeef.transformers.coil.gpu.BrightnessFilterTransformation
+import jp.wasabeef.transformers.coil.gpu.ContrastFilterTransformation
+import jp.wasabeef.transformers.coil.gpu.SharpenFilterTransformation
+import jp.wasabeef.transformers.coil.gpu.SketchFilterTransformation
 import java.io.ByteArrayOutputStream
 import java.io.File
 
 class ImageRequestManager(binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.StreamHandler {
     private var textureRegistry: TextureRegistry
     private var eventChannel: EventChannel
-    private var imagePipeline : ImagePipeline
     private var context : Context
     private var surfaceTextureEntry : TextureRegistry.SurfaceTextureEntry
     private var eventSink: EventChannel.EventSink? = null
 
     private var surface : Surface? = null
-    private var builder: ImageRequestBuilder? = null
+    private var loader: ImageLoader? = null
+    private var request: ImageRequest.Builder? = null
     private var mainHandler: Handler? = null
-    private var filter: HashMap<String, Any>? = null
+    private var filter: List<HashMap<String, Any>>? = null
 
     init {
         prepare()
@@ -52,8 +49,10 @@ class ImageRequestManager(binding: FlutterPlugin.FlutterPluginBinding) : EventCh
             "flutter_gpu_image/listener_"+getTextureId()
         )
         eventChannel.setStreamHandler(this)
-        imagePipeline = Fresco.getImagePipeline()
 
+        loader = ImageLoader.Builder(context).build()
+
+        request = ImageRequest.Builder(context)
         Images.get().create(this)
     }
 
@@ -75,22 +74,20 @@ class ImageRequestManager(binding: FlutterPlugin.FlutterPluginBinding) : EventCh
         val path = call.argument<String>("path")
         val bytes = call.argument<ByteArray>("bytes")
 
-        builder = if (path != null) {
-            ImageRequestBuilder.newBuilderWithSource(Uri.fromFile(File(path)))
+         if (path != null) {
+             request!!.data(File(path))
         } else {
-            val base64 = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.DEFAULT)
-            ImageRequestBuilder.newBuilderWithSource(Uri.parse(base64))
+            // val base64 = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.DEFAULT)
+             request!!.data(bytes)
+            //ImageRequestBuilder.newBuilderWithSource(Uri.parse(base64))
         }
-
-        builder!!.isProgressiveRenderingEnabled = false
 
         if (call.method == "renderFromBytes" || call.method == "renderFromFile") {
-            filter = call.argument<HashMap<String, Any>?>("filter")
+            filter = call.argument<List<HashMap<String, Any>>>("filter")
         }
 
-        val request = setFilter(filter).build()
-
-        transmitTexture(request, {
+        // val request = setFilter(filter).build()
+        transmitTexture(setFilter(filter), {
             onSuccess(it, result)
         }, {
             onFailure(result)
@@ -99,10 +96,9 @@ class ImageRequestManager(binding: FlutterPlugin.FlutterPluginBinding) : EventCh
 
      fun updateFilter(@NonNull call: MethodCall, @NonNull result: Result) {
         onProcess()
-        filter = call.argument<HashMap<String, Any>?>("filter")
-        val request: ImageRequest = setFilter(filter).build()
+        filter = call.argument<List<HashMap<String, Any>>>("filter")
 
-        transmitTexture(request, {
+        transmitTexture(setFilter(filter), {
             onSuccess(it, result)
         }, {
             onFailure(result)
@@ -154,17 +150,54 @@ class ImageRequestManager(binding: FlutterPlugin.FlutterPluginBinding) : EventCh
         result.error("1001", "render image failed", null)
     }
 
-    private fun setFilter(filter: HashMap<String, Any>?) : ImageRequestBuilder {
-        val type = filter?.get("type") as String?
-        builder!!.postprocessor = null
-        if (type == "brightness") {
-            val value = filter!!["value"] as Double
-            builder!!.postprocessor = BrightnessFilterPostprocessor(context, value.toFloat())
-        } else if (type == "contrast") {
-            val value = filter!!["value"] as Double
-            builder!!.postprocessor = ContrastFilterPostprocessor(context, value.toFloat())
+    private fun setFilter(filter: List<HashMap<String, Any>>?) : ImageRequest.Builder {
+        val transformations = mutableListOf<Transformation>()
+
+        filter?.forEach {
+            when (it["type"] as String) {
+                "brightness" -> {
+                    val value = it["value"] as Double
+                    transformations.add(BrightnessFilterTransformation(context, value.toFloat()))
+                }
+                "contrast" -> {
+                    val value = it["value"] as Double
+                    transformations.add(ContrastFilterTransformation(context, value.toFloat()))
+                }
+                "sharpen" -> {
+                    val value = it["value"] as Double
+                    transformations.add(SharpenFilterTransformation(context, value.toFloat()))
+                }
+                "gray_scale" -> {
+                    transformations.add(GrayScaleFilterTransformation(context))
+                }
+                "highlight_shadow" -> {
+                    val value = it["value"] as Double
+                    transformations.add(HighlightShadowFilterTransformation(context, value.toFloat()))
+                }
+                "gaussian_blur" -> {
+                    val value = it["value"] as Double
+                    transformations.add(GaussianBlurFilterTransformation(context, value.toFloat()))
+                }
+                "black_white" -> {
+                    transformations.add(BlackWhiteFilterTransformation(context))
+                }
+                "sobel_edge_detection" -> {
+                    val value = it["value"] as Double
+                    transformations.add(SobelEdgeDetectionFilterTransformation(context, value.toFloat()))
+                }
+                "sketch" -> {
+                    val value = it["value"] as Double
+                    transformations.add(SketchFilterTransformation(context))
+                }
+            }
         }
-        return builder!!
+        if (transformations.isNotEmpty()) {
+            request!!.transformations(transformations)
+        } else {
+            request!!.allowHardware(false)
+        }
+
+        return request!!
     }
 
     private fun rebuild(bitmap: Bitmap): Bitmap {
@@ -173,9 +206,9 @@ class ImageRequestManager(binding: FlutterPlugin.FlutterPluginBinding) : EventCh
             surface = null
         }
         if (surface == null) {
-            surface = Surface(surfaceTextureEntry!!.surfaceTexture())
+            surface = Surface(surfaceTextureEntry.surfaceTexture())
         }
-        surfaceTextureEntry!!.surfaceTexture().setDefaultBufferSize(bitmap.width, bitmap.height)
+        surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(bitmap.width, bitmap.height)
         if (surface != null && surface!!.isValid) {
             val rect = Rect(0, 0, bitmap.width, bitmap.height)
             val canvas = surface!!.lockCanvas(null)
@@ -186,30 +219,33 @@ class ImageRequestManager(binding: FlutterPlugin.FlutterPluginBinding) : EventCh
         return bitmap
     }
 
-    private fun transmitTexture(request: ImageRequest, onSuccess: ((bitmap: Bitmap) -> Unit)?, onFailure: ((dataSource : DataSource<CloseableReference<CloseableImage>>) -> Unit)?) {
-        val dataSource = imagePipeline.fetchDecodedImage(request, context)
-        dataSource.subscribe(
-            object : BaseBitmapDataSubscriber() {
-                override fun onNewResultImpl(bitmap: Bitmap?) {
-                    runOnMainThread {
-                        if (bitmap != null) {
-                            val image = rebuild(bitmap)
-                            if (onSuccess != null) {
-                                onSuccess(image)
-                            }
-                        } else {
-                            onFailureImpl(dataSource)
-                        }
+    private fun transmitTexture(request: ImageRequest.Builder, onSuccess: ((bitmap: Bitmap) -> Unit)?, onFailure: ((error: Drawable?) -> Unit)?) {
+
+        request.target(object : Target{
+            override fun onSuccess(result: Drawable) {
+                runOnMainThread {
+                    val image = rebuild((result as BitmapDrawable).bitmap)
+                    if (onSuccess != null) {
+                        onSuccess(image)
                     }
                 }
-                override fun onFailureImpl(dataSource : DataSource<CloseableReference<CloseableImage>>) {
+            }
+
+            override fun onError(error: Drawable?) {
+                runOnMainThread {
                     if (onFailure != null) {
-                        onFailure(dataSource)
+                        onFailure(error)
                     }
                 }
-            },
-            CallerThreadExecutor.getInstance()
-        )
+            }
+        })
+
+        request.listener(object: ImageRequest.Listener{
+            override fun onError(request: ImageRequest, result: ErrorResult) {
+                super.onError(request, result)
+            }
+        })
+        loader!!.enqueue(request.build())
     }
 
     private fun prepare() {

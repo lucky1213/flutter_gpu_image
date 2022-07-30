@@ -64,7 +64,7 @@ class FlutterGpuImageController extends ChangeNotifier
 
   Future<void> render({
     required FlutterGpuImageProvider image,
-    ImageFilter? filter,
+    List<ImageFilter> filter = const [],
   }) async {
     try {
       await _initialize();
@@ -72,13 +72,13 @@ class FlutterGpuImageController extends ChangeNotifier
         await _channel.invokeMethod('renderFromFile', {
           'id': textureId,
           'path': image.data,
-          'filter': filter?.toJson(),
+          'filter': filter.map((e) => e.toJson()).toList(),
         });
       } else {
         final data = await _channel.invokeMethod('renderFromBytes', {
           'id': textureId,
           'bytes': image.data,
-          'filter': filter?.toJson(),
+          'filter': filter.map((e) => e.toJson()).toList(),
         });
       }
     } catch (e) {
@@ -122,12 +122,14 @@ class FlutterGpuImageController extends ChangeNotifier
     }
   }
 
-  Future<void> setFilter(ImageFilter? filter) async {
+  Future<void> setFilter([
+    List<ImageFilter> filter = const [],
+  ]) async {
     try {
       await _initialize();
       await _channel.invokeMethod('setFilter', {
         'id': textureId,
-        'filter': filter?.toJson(),
+        'filter': filter.map((e) => e.toJson()).toList(),
       });
     } catch (e) {
       throw FlutterGpuImageException(e.toString());

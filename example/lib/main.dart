@@ -76,24 +76,42 @@ class _MyAppState extends State<MyApp> {
                     fit: BoxFit.contain,
                   ),
                 if (file != null) ...[
+                  // FlutterGpuImage(
+                  //   image: FlutterGpuMemoryImageProvider(byte!),
+                  //   filter: [
+                  //     ImageFilter.blackWhite(),
+                  //     ImageFilter.sketch(),
+                  //   ],
+                  //   width: 200,
+                  //   loadingBuilder: (context) {
+                  //     return const Center(child: Text('loading'));
+                  //   },
+                  //   fit: BoxFit.cover,
+                  // ),
                   FlutterGpuImage(
                     image: FlutterGpuMemoryImageProvider(byte!),
-                    filter: ImageFilter.brightness(-0.3),
-                    width: 100,
+                    filter: [
+                      // ImageFilter.brightness(0.5),
+                      // ImageFilter.contrast(1.0),
+                      ImageFilter.normal(),
+                    ],
+                    width: 200,
                     loadingBuilder: (context) {
                       return const Center(child: Text('loading'));
                     },
                     fit: BoxFit.cover,
                   ),
-                  FlutterGpuImage(
-                    image: FlutterGpuMemoryImageProvider(byte!),
-                    filter: ImageFilter.contrast(2),
-                    width: 100,
-                    loadingBuilder: (context) {
-                      return const Center(child: Text('loading'));
-                    },
-                    fit: BoxFit.cover,
-                  ),
+                  // FlutterGpuImage(
+                  //   image: FlutterGpuMemoryImageProvider(byte!),
+                  //   filter: [
+                  //     ImageFilter.sobelEdgeDetection(2),
+                  //   ],
+                  //   width: 100,
+                  //   loadingBuilder: (context) {
+                  //     return const Center(child: Text('loading'));
+                  //   },
+                  //   fit: BoxFit.cover,
+                  // ),
                 ],
                 TextButton(
                   onPressed: () async {
